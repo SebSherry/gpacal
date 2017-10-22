@@ -1,14 +1,11 @@
 #Imports
+import sys
 import copy
+import getopt
 from collections import Counter
 
-#Current grades to date 
-cur_grades = [
-    #INSERT GRADES HERE
-]
-
-#The grade options (We assume no failures)
-options = [4,5,6,7]
+OPTIONS = [4,5,6,7] #The grade OPTIONS (We assume no failures)
+MIN_GRADE = 4 #Lowest possible grade (We assume no failures)
 
 #Calculate GPA
 def calc_gpa(grades):
@@ -24,40 +21,31 @@ def calc_gpa(grades):
     gpa = float(total) / len(grades)
     return gpa
 
-def gen_matrix(subjects):
+def calc_matrix(grades, subjects):
     """
-        Generates a list of dictonaries to hold all possible grade outcomes for a semester
+        Calculates a matrix all the possible gpas based on previous semester results and all possible results for this semester
 
-        subjects : list of string codes for all the subjects in the semester
+        grades : list of int scores for all subjects done up to this point
+        subjects : amount of units being completed this semester
     """
-    #Create base dictonary
-    base = {"Total" : 0}
-    for unit in subjects:
-        base[unit] = 0
-
     #Calculate the number of rows in the matrix
     # 4 to the power of the amount of subjects in the unit
-    rows = 4 ** len(subjects)
+    rows = 4 ** subjects
 
     #Setup counting array
-    counts = [0 for x in subjects]
+    counts = [MIN_GRADE for x in range(subjects)]
 
-    print(counts,base)
     #Generate matrix
     matrix = []
     for i in range(rows):
-        #create row
-        row = copy.deepcopy(base)
-        
-        #Loop over subjects and apply grades
-        for idx, unit in enumerate(subjects):
-            row[unit] = 4 + counts[idx]
-        
+        #create row and calculate GPA
+        row = {"Scores" : copy.deepcopy(counts), "Total" : calc_gpa(grades+counts)}
+         
         #update counts
         counts[-1] += 1
         for i in range(len(counts)-1,-1,-1):
-            if counts[i] == 4:
-                counts[i] = 0
+            if counts[i] == 8:
+                counts[i] = MIN_GRADE
                 if i-1 >= 0:
                     counts[i-1] += 1
 
@@ -66,52 +54,38 @@ def gen_matrix(subjects):
 
     return matrix
 
-def calc_matrix(matrix, grades):
-    """ 
-        Calculates all the possible gpas based on previous semester results and all possible results for this semester
-
-        matrix : list of dicts containing all possible grade out comes of for a semester
-        grades : list of int scores for all subjects done up to this point
-    """
-    #Loop over the matrix
-    for row in matrix:
-        #Get a list of all the grades in the row
-        outcomes = []
-        for key in row:
-            if key != "Total":
-                outcomes.append(row[key])
-
-        #Calculate the gpa for this outcome
-        row["Total"] = calc_gpa(grades+outcomes)
-
 def print_matrix(matrix, subjects):
     """
         Prints the matrix as a table
 
         matrix : matrix to print
-        subjects : list of string codes for all the subjects in the semester
+        subjects : amount of units being completed this semester
     """
     #create format string 
     fmtstr = "{0:3} " #row number 
-    for idx, key in enumerate(subjects):
+    for i in range(subjects):
         fmtstr += "{"
-        fmtstr += "{}:{}".format(idx+1,len(key))
+        fmtstr += "{}:4".format(i+1)
         fmtstr += "} "
-    
-    #Print table header
-    print((fmtstr+"GPA").format(*([" "]+subjects)))
     
     #Add GPA to format string
     fmtstr += "{"
-    fmtstr += "{}:.3f".format(len(subjects)+1)
+    fmtstr += "{}:.3f".format(subjects+1)
     fmtstr += "}"
+    
+    #Print table header
+    header = " " * 4
+    for i in range(subjects):
+        header += "SUB{} ".format(i+1)
+
+    header += "GPA"
+    print(header)
             
     #Print matrix 
     for i in range(len(matrix)):
         args = [i+1]
-        for unit in subjects:
-            args.append(matrix[i][unit])
-        args.append(matrix[i]["Total"])
+        args += matrix[i]["Scores"]
+        args.append(matrix[i]["Total"]) 
         print(fmtstr.format(*args))
 
 def calc_stats(gpas):
@@ -145,17 +119,122 @@ def calc_stats(gpas):
     print("Median: {0:.3f}".format(med_gpa))
     print("Mode: {0:.3f}".format(mode_gpa))
 
+def get_subjects():
+    """
+        Gets all amount of subjects the user is taking this semeser
+
+        Returns : int amount of subjects
+    """
+    subjects = input("How many subjects are you taking this semester? ")
+    
+    #Parse input
+    try:
+        if int(subjects) < 1:
+            print("Invalid number of subjects. Exiting")
+            sys.exit(1)
+    except Exception as e:
+        print("Invalid number of subjects. Exiting")
+        sys.exit(1)
+
+    return int(subjects)
+
+def get_grades():
+    """
+        Gets all of the user's current grades to date
+
+        Returns : list of the user's current grades
+    """
+    grades = []
+    reading = True
+    while reading:
+        ipt = input("Enter your current grades 1 by 1 or x to stop: ")
+        try:
+            #If finished
+            if ipt == "x":
+                reading = False
+                break
+            #else check if valid input
+            else:
+                grade = int(ipt)
+                if grade < 1 or grade > 7:
+                    print("Invalid entry")
+                else:
+                    grades.append(grade)
+        except:
+            print("Invalid entry")
+
+    return grades
+
+def read_grades(filen):
+    """
+        Reads in all list of grades from a file
+
+        filen : path to the file to read
+
+        Returns : list of the user's current grades
+    """
+    grades = []
+    with open(filen,'r') as f:
+        for line in f.readlines():
+            for i in line.strip().split(","):
+                if i != '':
+                    grades.append(int(i.replace(" ","")))
+
+    return grades
+
+def get_parameters(argv):
+    """
+        Gets the amount of subjects to test the current grades to date
+
+        argv : command line arguments
+
+        Returns : tuple (subjects, grades)
+    """
+    subjects = 0
+    grades = []
+
+    #Read command line arguments
+    try:
+        opts, args = getopt.getopt(argv,"hs:f:",[])
+    except getopt.GetoptError:
+        usage()
+    for opt, arg in opts:
+        #Usage
+        if opt == '-h':
+            usage()
+        #Subject count
+        elif opt == "-s":
+            subjects = int(arg)
+        #Grades
+        elif opt == "-f":
+            grades = read_grades(arg)
+
+    #If argument ommitted, get via CLI 
+    if subjects == 0:
+        subjects = get_subjects()
+
+    if grades == []:
+        grades = get_grades()
+
+    #Return subjects and grades
+    return subjects, grades
+
+def usage():
+    """Prints command line arguments"""
+    print("""Usage: main.py <args>
+    -h          Displays this message
+    -s          Amount of subjects to calculate for this semester
+    -f          File containing current grades till this point""")
+    sys.exit(2)
 
 #Main
 if  __name__ == "__main__":
-    #Generate matrix
-    subjects = ["SUB001", "SUB002", "SUB003"]
-    print("Generating matrix")
-    matrix = gen_matrix(subjects)
+    #Read in parameters
+    subjects, grades = get_parameters(sys.argv[1:])
     
     #Calculate all possible GPAS
     print("Calculating gpas")
-    calc_matrix(matrix,cur_grades)
+    matrix = calc_matrix(grades,subjects)
     
     #Print matrix
     print_matrix(matrix, subjects)
