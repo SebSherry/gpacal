@@ -1,2 +1,6 @@
 #Ignore grades files
 grades.txt
+
+#pycache
+**.pyc
+pycache/

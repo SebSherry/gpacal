@@ -1,4 +1,6 @@
 #Imports
+from __future__ import division
+
 import sys
 import copy
 import getopt
@@ -14,12 +16,7 @@ def calc_gpa(grades):
 
         grades : list of ints used as scores to calculate a gpa score
     """
-    total = 0
-    for grade in grades:
-        total += grade
-    
-    gpa = float(total) / len(grades)
-    return gpa
+    return sum(grades) / len(grades) 
 
 def calc_matrix(grades, subjects):
     """
@@ -28,29 +25,36 @@ def calc_matrix(grades, subjects):
         grades : list of int scores for all subjects done up to this point
         subjects : amount of units being completed this semester
     """
-    #Calculate the number of rows in the matrix
-    # 4 to the power of the amount of subjects in the unit
-    rows = 4 ** subjects
-
-    #Setup counting array
-    counts = [MIN_GRADE for x in range(subjects)]
+    #Setup counting and base arrays
+    base = [MIN_GRADE for x in range(subjects)]
+    counts = copy.deepcopy(base)
 
     #Generate matrix
     matrix = []
-    for i in range(rows):
+    calc = True
+    while calc:
         #create row and calculate GPA
         row = {"Scores" : copy.deepcopy(counts), "Total" : calc_gpa(grades+counts)}
-         
+        
+        #add row to matrix
+        matrix.append(row)
+
+        #exit
+        if counts == [7 for x in range(subjects)]:
+            break
+        
         #update counts
         counts[-1] += 1
         for i in range(len(counts)-1,-1,-1):
             if counts[i] == 8:
-                counts[i] = MIN_GRADE
+                if base[i] == 7 and i-1 >= 0:
+                    base[i] = base[i-1] + 1
+                else:
+                    base[i] += 1
+
+                counts[i] = base[i]
                 if i-1 >= 0:
                     counts[i-1] += 1
-
-        #add row to matrix
-        matrix.append(row)
 
     return matrix
 
@@ -102,22 +106,55 @@ def calc_stats(gpas):
     avg_gpa = calc_gpa(gpas)
 
     #median
-    sorted_gpas = sorted(gpas)
-    mid = int(len(gpas)/2)
-    if mid % 2 == 1:
-        med_gpa = sorted_gpas[mid]
-    else:
-        med_gpa = (sorted_gpas[mid-1] + sorted_gpas[mid]) / 2
+    med_gpa = median(gpas)
 
     #mode 
-    counts = Counter(gpas)
-    mode_gpa = counts.most_common(1)[0][0] 
+    mode_gpa = mode(gpas) 
     
     #Print results
     print("Your GPA can range from {0:.3f} to {1:.3f}".format(min_gpa, max_gpa))
     print("Average possible GPA: {0:.3f}".format(avg_gpa))
     print("Median: {0:.3f}".format(med_gpa))
-    print("Mode: {0:.3f}".format(mode_gpa))
+    
+    #Handle multiple modes
+    mode_str = "Mode: "
+    for score in sorted(mode_gpa):
+        mode_str += "{0:.3f}, ".format(score)
+
+    print(mode_str[:-2])
+
+
+def median(gpas):
+    """ 
+        Calcuates the median ("Middle most value") of the calculated GPAS
+        Taken from: Data Science from Scratch by Joel Grus
+
+        gpas : list of calculated gpas 
+    """
+    length = len(gpas)
+    ordered = sorted(gpas)
+    midpoint = length // 2
+
+    #If odd return the middle value
+    if length % 2 == 1:
+        return ordered[midpoint]
+
+    #Else return average of the two middle values
+    else:
+        low = midpoint - 1
+        return (ordered[low] + ordered[midpoint]) / 2
+
+def mode(gpas):
+    """ 
+        Calcuates the mode ("Most common value(s)") of the calculated GPAS
+        Taken from: Data Science from Scratch by Joel Grus
+
+        gpas : list of calculated gpas 
+    """
+    counts = Counter(gpas)
+    max_count = max(counts.values())
+    return [x for x, count in counts.items() if count == max_count]
+
 
 def get_subjects():
     """
