@@ -42,13 +42,14 @@ def calc_matrix(grades, subjects):
         #exit
         if counts == [7 for x in range(subjects)]:
             break
-        
+
         #update counts
         counts[-1] += 1
         for i in range(len(counts)-1,-1,-1):
             if counts[i] == 8:
                 if base[i] == 7 and i-1 >= 0:
-                    base[i] = base[i-1] + 1
+                    if base[i-1] + 1 < 7:
+                        base[i] = base[i-1] + 1
                 else:
                     base[i] += 1
 
